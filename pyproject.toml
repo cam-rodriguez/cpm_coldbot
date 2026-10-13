@@ -1,0 +1,24 @@
+[project]
+name = "cpm-coldbot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "datetime>=6.0",
+    "dotenv>=0.9.9",
+    "numpy>=2.5.1",
+    "pandas>=3.0.5",
+    "pathlib>=1.0.1",
+    "python-dotenv>=1.2.2",
+    "requests>=2.34.2",
+    "slack-sdk>=3.43.0",
+    "sodapy>=2.2.0",
+    "tabulate>=0.10.0",
+    "urllib3>=2.7.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+]
