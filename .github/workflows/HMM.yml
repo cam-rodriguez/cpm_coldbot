@@ -1,0 +1,59 @@
+name: colddeaths
+
+on:
+  schedule:
+    - cron: "0 * * * *" # every hour
+  workflow_dispatch:
+
+  
+jobs:
+  build-cache:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.8.4"
+          python-version: "3.13"
+          enable-cache: false
+
+      - name: Install dependencies and populate cache
+        run: |
+          echo "Building global UV cache..."
+          uv sync --group dev
+          echo "Cache populated successfully"
+
+      - name: Save uv caches
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cache/uv
+            ~/.local/share/uv
+            .venv
+          key: uv-main-${{ hashFiles('uv.lock') }}
+
+      - name: download files and push to slack
+        env:
+          SLACK_CHANNEL_WEBHOOK: ${{ secrets.SLACK_CHANNEL_WEBHOOK }}
+          COOK_CO_APPTOKEN: ${{ secrets.COOK_CO_APPTOKEN }}
+        run: bash script.sh
+
+      - name: add and commit
+        id: add_commit
+        uses: EndBug/add-and-commit@v10
+        with:
+          committer_name: Automated
+          committer_email: actions@users.noreply.github.com
+          message: "Newest scraped data"
+
+      - name: Push
+        run: git push
+
+      # - name: The Slack GitHub Action
+      #   uses: slackapi/slack-github-action@v4.0.0
+      #   with:
+      #     # A location for posting request payloads.
