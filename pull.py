@@ -52,15 +52,21 @@ client = Socrata(agency,
 meta = []
 meta = client.get_metadata(dataset)
 
+###### change as of 11/21/26... going to pull ALL, then filter and query afterward. not a huge change.
 # pull cold-related deaths from socrata into a dataframe
-today_download = client.get(dataset, query=today_query, exclude_system_fields=False)
-yesterday_download = client.get(dataset, query=yesterday_query, exclude_system_fields=False)
+# today_download = client.get(dataset, query=today_query, exclude_system_fields=False)
+# yesterday_download = client.get(dataset, query=yesterday_query, exclude_system_fields=False)
 all_download = client.get(dataset, query=all_query, exclude_system_fields=False)
 
 # to dataframe
-today_df = pd.DataFrame(today_download)
-yesterday_df = pd.DataFrame(yesterday_download)
 all_df = pd.DataFrame(all_download)
+# today_df = pd.DataFrame(today_download)
+# yesterday_df = pd.DataFrame(yesterday_download)
+today_df = all_df[(all_df['death_date'] >= '2026-10-01') & (all_df['death_date'] <= today)]
+yesterday_df = all_df[(all_df['death_date'] >= '2026-10-01') & (all_df['death_date'] <= yesterday)]
+
+# ##### TESTING ONLY #######
+# today_df = pd.read_csv('./data/today_colddeaths.csv')
 
 ########## save copies of the data to share ##################
 # ## most recent version
@@ -109,15 +115,16 @@ def send_message(content, webhook):
 def textgenerator(df1, df2):
     newlen = len(df2)
     length = len(df2) - len(df1)
+    chicagolen = len(df2[df2['incident_city'] == 'CHICAGO'])
 
     if length == 0:
-        txt = f"No new data was added to the dataset between the last scrape and this one. The current number of cold deaths starting October 1 is still {newlen}. \n <{stringlink}|Click here> to view the data portal, and <{gitlink}|here> to view the most recent data."
+        txt = f"No new data was added to the dataset between the last scrape and this one. The current number of cold deaths in Cook County starting October 1 is still {newlen}. In Chicago, it's {chicagolen}. \n <{stringlink}|Click here> to view the data portal, and <{gitlink}|here> to view the most recent data."
 
     elif length == 1:
-        txt = f"*One new row* was added to the dataset. The current number of cold deaths starting October 1 is now {newlen}. \n <{stringlink}|Click here> to view the data portal, and <{gitlink}|here> to view the most recent data. <!channel>"
+        txt = f"*One new row* was added to the dataset. The current number of cold deaths in Cook County starting October 1 is now {newlen}. In Chicago, it's {chicagolen}. \n <{stringlink}|Click here> to view the data portal, and <{gitlink}|here> to view the most recent data. <!channel>"
 
     elif length > 1:
-        txt = f"*{length} new rows* were added to the dataset. The current number of cold deaths starting October 1 is now {newlen}. \n <{stringlink}|Click here> to view the data portal, and <{gitlink}|here> to view the most recent data. <!channel>"
+        txt = f"*{length} new rows* were added to the dataset. The current number of cold deaths in Cook County starting October 1 is now {newlen}. In Chicago, it's {chicagolen}. \n <{stringlink}|Click here> to view the data portal, and <{gitlink}|here> to view the most recent data. <!channel>"
 
     else:
         txt = f"Error of some kind..."
@@ -147,7 +154,7 @@ if newpull.equals(oldpull) != 'True': # in this case, it'll be the newest scrape
     numdiff = len(newpull) - len(oldpull) 
 
     # drop nonmatching rows (and yes, there's probably a better way to do this)
-    newrows = newpull[~newpull.isin(oldpull)] 
+    newrows = newpull[~newpull['casenumber'].isin(oldpull)] 
     newrows = newrows[~newrows['casenumber'].isna()]
 
     # generating things for text
@@ -171,29 +178,28 @@ if newpull.equals(oldpull) != 'True': # in this case, it'll be the newest scrape
 
 
     newrows['maploc'] = newrows['inc_loc'].str.replace(' ','+',regex=True)
-    gmaps_start = "https://google.com/maps/place/"
-    newrows['gmaps_link'] = "<" + gmaps_start + newrows['maploc'] + "/ | here >"
+    # gmaps_start = "https://google.com/maps/place/"
+    # newrows['gmaps_link'] = "<" + gmaps_start + newrows['maploc'] + "/ | here >"
 
-    # newrows['gmaps_link'] = f'<{gmaps_start}/{maploc}/ | >'
+    # # newrows['gmaps_link'] = f'<{gmaps_start}/{maploc}/ | >'
 
     # concatenate to get a big string
-    newrows_trunc = newrows[['casenumber','inc_date','dth_date','age', 'incident_city', 'gender','race','latino','primarycause','secondarycause','inc_loc','chi_ward','chi_commarea','residence_city','gmaps_link']]
+    newrows_trunc = newrows[['casenumber','inc_date','dth_date','age', 'incident_city', 'gender','race','latino','primarycause','secondarycause','inc_loc','chi_ward','chi_commarea','residence_city']]
     
     # make it a string list
-    newrows_trunc['stringy'] = "• *Case number " + newrows_trunc['casenumber'] + "* — a " + newrows_trunc['age'] + "-year-old " + newrows_trunc['latino'] + " " + newrows_trunc['race'] + " " + newrows_trunc['gender'].str.lower() + " in " + newrows_trunc['incident_city'].str.title() + ". \n The determined cause of death is " + newrows_trunc['primarycause'] + " and " + newrows_trunc['secondarycause'] + ". The death date was *" + newrows_trunc['dth_date'] + "* and the incident that led to their death was on *" + newrows_trunc['inc_date'] + "* at " + newrows_trunc['inc_loc'] + ". 📍 view incident location " + newrows_trunc['gmaps_link'] + ". \n"
+    newrows_trunc['stringy'] = "• *Case number " + newrows_trunc['casenumber'] + "* — a " + newrows_trunc['age'] + "-year-old " + newrows_trunc['latino'] + " " + newrows_trunc['race'] + " " + newrows_trunc['gender'].str.lower() + " in " + newrows_trunc['incident_city'].str.title() + ". \n The determined cause of death is " + newrows_trunc['primarycause'] + " and " + newrows_trunc['secondarycause'] + ". The death date was *" + newrows_trunc['dth_date'] + "* and the incident that led to their death was on *" + newrows_trunc['inc_date'] + "* at " + newrows_trunc['inc_loc'] + ". \n"
     stringy_list = newrows_trunc['stringy']
 
     ########
     # send leading message about the update with the diff#
 
     text = textgenerator(oldpull, newpull)
-    formatted = f'❗️ *{placeholder} update — {today}* \n {text} \n'
+    formatted = f'❄️ *{placeholder} update — {today}* \n {text} \n'
     send_message(formatted, SLACK_WEBHOOK)
 
     # send the details about each row in the diff #
     # for every new row in the new data, send a message with that row's contents
     for item in list(stringy_list):
-
         # dataformat = f'The updated data rows are below: \n {list}'
         send_message(item, SLACK_WEBHOOK)
         print("sent!")
@@ -206,3 +212,4 @@ if newpull.equals(oldpull) != 'True': # in this case, it'll be the newest scrape
 archiveversion = today_df
 archiveversion.to_csv('./data/archive/lastversion.csv')
 # ^ this will now become the oldpull for the next scrape!
+
